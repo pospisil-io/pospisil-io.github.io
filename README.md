@@ -1,3 +1,0 @@
-# pospisil.io README.md
-
-Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. Text text text text text text text. 
