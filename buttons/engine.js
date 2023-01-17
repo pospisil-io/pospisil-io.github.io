@@ -1,68 +1,195 @@
-const pospisil = {
-    // BAF!!!
-}
 document.addEventListener('DOMContentLoaded', () => {
-    let world, mass, body, ground, shape, timeStep = 1 / 60,
-        camera, scene, renderer, geometry, material, mesh, plane, planeGeo, clock, control;
-    let commandInput = [], commandVector = new CANNON.Vec3(0, 0, 0)
-
-    const initCannon = () => {
-        world = new CANNON.World();
-        world.gravity.set(0, 0, -9.81);
-        world.broadphase = new CANNON.NaiveBroadphase();
-        world.solver.iterations = 10;
-
-        // shape = new CANNON.Box(new CANNON.Vec3(.5, .5, .5));
-        body = new CANNON.Body({
-            mass: 1,
-            position: new CANNON.Vec3(0, 0, .5),
-            shape: new CANNON.Sphere(.5)
-        });
-        world.addBody(body);
-
-        planeGeo = new CANNON.Plane()
-        ground = new CANNON.Body()
-        ground.addShape(planeGeo)
-        world.addBody(ground)
-    }
+    let camera, scene, renderer,
+        raycaster, pointer, INTERSECTED, platforms = [],
+        sun, viewTarget = new THREE.Vector3(0, 0, 0),
+        clock, control
 
     const initThree = () => {
         THREE.Object3D.DefaultUp = new THREE.Vector3(0, 0, 1)
+
+        let horizontalCount = Math.ceil(window.innerWidth / 100) + 2
+        let verticalCount = Math.ceil(window.innerHeight / window.innerWidth * horizontalCount)
+        let padding = .05
+
         scene = new THREE.Scene();
-        scene.add(new THREE.AxesHelper(5))
 
-        // material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
-        // geometry = new THREE.BoxGeometry(1, 1, 1);
-        mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(1, 32, 16),
-            new THREE.MeshLambertMaterial({
-                color: 0x00ff00,
-                wireframe: true
-            })
-        )
-        mesh.castShadow = true
-        mesh.add(new THREE.AxesHelper(3))
-        scene.add(mesh);
+        const fog = new THREE.Fog(0x000000)
+        fog.far = 38
+        scene.fog = fog
 
-        camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, .1, 1000);
-        // camera.up.set(0, 0, 1)
-        // camera.position.set(0, -10, 5)
-        // camera.position = mesh.position.add(new THREE.Vector3(0, -100, 50))
-        camera.position.set(0, -10, 5)
-        camera.lookAt(mesh.position);
+        camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, .1, 10000)
+        scene.add(camera)
 
-        scene.add(camera);
+        const placeLight = (color, position) => {
+            let light = new THREE.PointLight(color)
+            light.position.copy(position)
+            light.castShadow = true
+            light.shadow.mapSize.width = 512
+            light.shadow.mapSize.height = 512
+            light.shadow.camera.near = 0.1
+            light.shadow.camera.far = 100
+            light.radius = 2
+            scene.add(light)
+            return light
+        }
+        // const lightCursor = placeLight(0x222222, new THREE.Vector3(0, 0, 5))
+        const lightRed = placeLight(0xff0000, new THREE.Vector3(-10, 8, 5))
+        const lightGreen = placeLight(0x00ff00, new THREE.Vector3(10, 8, 5))
+        const lightBlue = placeLight(0x0000ff, new THREE.Vector3(0, -8, 5))
+        const lightLowAngle = placeLight(0xffffff, new THREE.Vector3(-10, 20, 1))
+        sun = new THREE.DirectionalLight(0xffffff)
+        scene.add(sun)
 
-        var planeGeometry = new THREE.PlaneGeometry(10, 10, 1, 1);
-        var planeMaterial = new THREE.MeshLambertMaterial({ color: 0x777777, wireframe: true });
-        var plane = new THREE.Mesh(planeGeometry, planeMaterial);
-        plane.receiveShadow = true;
-        scene.add(plane)
+        raycaster = new THREE.Raycaster()
+        pointer = new THREE.Vector2()
 
-        let ambientLight = new THREE.AmbientLight(0xaaaaaa)
-        scene.add(ambientLight)
+        const generateTexture = (text) => {
+            const canvas = document.createElement('canvas')
+            canvas.width = 128
+            canvas.height = 128
+            const ctx = canvas.getContext('2d')
+            ctx.fillStyle = 'white'
+            ctx.fillRect(0, 0, 128, 128)
+            ctx.font = '48px arial'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillStyle = 'black'
+            ctx.fillText(text, 64, 64)
+            return new THREE.CanvasTexture(canvas)
+        }
 
-        renderer = new THREE.WebGLRenderer()
+        const keyMap = [
+            {
+                x: -5, y: 1, character: 'q', action: () => {
+                    moveCamera(
+                        new THREE.Vector3(-horizontalCount * 1 / 2, verticalCount / 3, 3),
+                        new THREE.Vector3(-5, 2, 0),
+                    )
+                }
+            },
+            { x: -4, y: 1, character: 'w', action: () => {
+                moveCamera(
+                    new THREE.Vector3(0, -2, 17),
+                    new THREE.Vector3(0, -.1, 0),
+                )
+            } },
+            { x: -3, y: 1, character: 'e', action: () => {
+                moveCamera(
+                    new THREE.Vector3(horizontalCount * 1 / 2, verticalCount / 3, 3),
+                    new THREE.Vector3(5, -2, 0),
+                )
+            } },
+            { x: -2, y: 1, character: 'r', action: () => {
+                toggleLight(lightRed)
+            } },
+            { x: -1, y: 1, character: 't' },
+            { x: 0, y: 1, character: 'y' },
+            { x: 1, y: 1, character: 'u' },
+            { x: 2, y: 1, character: 'i' },
+            { x: 3, y: 1, character: 'o' },
+            { x: 4, y: 1, character: 'p' },
+            { x: -5, y: 0, character: 'a', action: () => {
+                moveCamera(
+                    new THREE.Vector3(-horizontalCount * 1 / 2, -verticalCount / 3, 3),
+                    new THREE.Vector3(-5, -2, 0),
+                )
+            } },
+            { x: -4, y: 0, character: 's', action: () => {
+                moveCamera(
+                    new THREE.Vector3(0, -verticalCount * 2 / 3, 3),
+                    new THREE.Vector3(0, -3, 0),
+                )
+            } },
+            { x: -3, y: 0, character: 'd', action: () => {
+                moveCamera(
+                    new THREE.Vector3(horizontalCount * 1 / 2, -verticalCount / 3, 3),
+                    new THREE.Vector3(5, -2, 0),
+                )
+            } },
+            { x: -2, y: 0, character: 'f' },
+            { x: -1, y: 0, character: 'g', action: () => {
+                toggleLight(lightGreen)
+            } },
+            { x: 0, y: 0, character: 'h', action: () => {
+                toggleLight(sun)
+            } },
+            { x: 1, y: 0, character: 'j' },
+            { x: 2, y: 0, character: 'k' },
+            { x: 3, y: 0, character: 'l' },
+            { x: -4, y: -1, character: 'z' },
+            { x: -3, y: -1, character: 'x' },
+            { x: -2, y: -1, character: 'c' },
+            { x: -1, y: -1, character: 'v' },
+            { x: 0, y: -1, character: 'b', action: () => {
+                toggleLight(lightBlue)
+            } },
+            { x: 1, y: -1, character: 'n' },
+            { x: 2, y: -1, character: 'm' }
+        ]
+
+        const buttonGeometry = new THREE.BoxGeometry(1, 1, .2)
+        for (let v = 0; v < verticalCount; v++) {
+            for (let h = 0; h < horizontalCount; h++) {
+                let buttonBackgroundColor = new THREE.Color(0xffffff)
+                const buttonFaceMaterial = new THREE.MeshStandardMaterial({
+                    color: buttonBackgroundColor,
+                    roughness: 0,
+                    metalness: 0
+                })
+                const buttonFacesMaterials = [
+                    new THREE.MeshStandardMaterial({ color: buttonBackgroundColor }), //right side
+                    new THREE.MeshStandardMaterial({ color: buttonBackgroundColor }), //left side
+                    new THREE.MeshStandardMaterial({ color: buttonBackgroundColor }), //top side
+                    new THREE.MeshBasicMaterial({ color: buttonBackgroundColor }), //bottom side
+                    buttonFaceMaterial, //front side
+                    new THREE.MeshStandardMaterial({ color: buttonBackgroundColor }) //back side
+                ]
+                const buttonMesh = new THREE.Mesh(buttonGeometry, buttonFacesMaterials)
+                buttonMesh.position.x = - Math.floor(horizontalCount / 2) * (1 + padding) + (horizontalCount % 2 == 0 ? .5 * (1 + padding) : 0) + h * (1 + padding)
+                buttonMesh.position.y = - Math.floor(verticalCount / 2) * (1 + padding) + (verticalCount % 2 == 0 ? .5 * (1 + padding) : 0) + v * (1 + padding)
+                const key = _.find(keyMap, {
+                    'x': Math.floor(buttonMesh.position.x),
+                    'y': Math.floor(buttonMesh.position.y)
+                })
+                if (key !== undefined) {
+                    buttonFaceMaterial.map = generateTexture(key.character)
+                    key.mesh = buttonMesh
+                }
+                buttonMesh.castShadow = true;
+                buttonMesh.receiveShadow = true;
+                buttonMesh.onPointerIn = (obj, scene) => {
+                    if (obj.tweenRunning) obj.tween.stop()
+                    obj.tween = new TWEEN.Tween(obj.rotation).easing(TWEEN.Easing.Quadratic.InOut).to({
+                        x: buttonMesh.position.y / 20,
+                        y: -buttonMesh.position.x / 20,
+                        z: 0
+                    }, 250).onStart(() => {
+                        obj.tweenRunning = true
+                    }).onComplete(() => {
+                        obj.tweenRunning = false
+                    }).start()
+                }
+                buttonMesh.onPointerOut = (obj, scene) => {
+                    obj.tween = new TWEEN.Tween(obj.rotation).easing(TWEEN.Easing.Quadratic.InOut).to({
+                        x: 0,
+                        y: 0,
+                        z: 0
+                    }, 1000).onStart(() => {
+                        obj.tweenRunning = true
+                    }).onComplete(() => {
+                        obj.tweenRunning = false
+                    }).delay(500).start()
+                }
+                buttonMesh.v = v
+                buttonMesh.h = h
+                scene.add(buttonMesh)
+                platforms.push(buttonMesh)
+            }
+        }
+
+        renderer = new THREE.WebGLRenderer({
+            antialias: true
+        })
         renderer.setClearColor(new THREE.Color(0x000000));
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
@@ -73,70 +200,149 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('resize', () => {
             renderer.setSize(window.innerWidth, window.innerHeight);
             camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            camera.updateProjectionMatrix()
+        })
+        document.addEventListener('pointermove', (ev) => {
+            pointer.x = (ev.clientX / window.innerWidth) * 2 - 1
+            pointer.y = - (ev.clientY / window.innerHeight) * 2 + 1
+            // lightCursor.position.set(pointer.x * horizontalCount, pointer.y * verticalCount, 5)
+            // console.log(pointer);
         })
 
-        control = new pospisil.flexCamMouseControl({
-            easing: TWEEN.Easing.Quadratic.Out
-        }, renderer.domElement)
-
-        const setCommandVector = () => {
-            if (commandInput.length == 0) commandVector.set(0, 0, 0)
-            let horizontal = 0, vertical = 0, rotation = 0
-            if (commandInput.indexOf('KeyA') > -1) horizontal -= 1
-            if (commandInput.indexOf('KeyD') > -1) horizontal += 1
-            if (commandInput.indexOf('KeyW') > -1) vertical += 1
-            if (commandInput.indexOf('KeyS') > -1) vertical -= 1
-            if (commandInput.indexOf('KeyQ') > -1) rotation -= 1
-            if (commandInput.indexOf('KeyE') > -1) rotation += 1
-            commandVector.set(horizontal, vertical, rotation)
+        const moveCamera = (to, lookAt) => {
+            new TWEEN.Tween(camera.position).easing(TWEEN.Easing.Quadratic.InOut).to({
+                x: to.x,
+                y: to.y,
+                z: to.z
+            }, 400).onUpdate(() => {
+                if (sun.intensity > 0) sun.intensity = camera.position.z / 20
+            }).start()
+            new TWEEN.Tween(viewTarget).easing(TWEEN.Easing.Quadratic.InOut).to({
+                x: lookAt.x,
+                y: lookAt.y,
+                z: lookAt.z
+            }, 400).start()
+            camera.updateProjectionMatrix()
+        }
+        const toggleLight = (light) => {
+            if (light.intensity !== 0) {
+                light.setIntensity = light.intensity
+                new TWEEN.Tween(light).to({
+                    intensity: 0
+                }, 100).start()
+            } else {
+                new TWEEN.Tween(light).to({
+                    intensity: (light === sun ? camera.position.z / 20 : 1)
+                }, 100).start()
+            }
         }
 
-        document.addEventListener('keydown', (ev) => {
-            if (ev.repeat) return false
-            commandInput = _.concat(commandInput, ev.code)
-            setCommandVector()
-            // console.log(commandInput);
+        _.each(keyMap, (key) => {
+            Mousetrap.bind(key.character, () => {
+                if(key.pressed) return
+                new TWEEN.Tween(key.mesh.position).to({
+                    z: -.1
+                }, 20).onComplete(() => {
+                    key.pressed = true
+                    if(key.action) key.action()
+                }).start()
+            })
+            Mousetrap.bind(key.character, () => {
+                key.pressed = false
+                new TWEEN.Tween(key.mesh.position).to({
+                    z: 0
+                }, 80).delay(20).start()
+            }, 'keyup')
         })
-        document.addEventListener('keyup', (ev) => {
-            _.remove(commandInput, i => i == ev.code)
-            setCommandVector()
-            // console.log(commandInput);
-        })
+
+        const flexCamMouseControl = function (options, rendererDomElement) {
+            const scope = this
+            this.easing = options.easing
+            this.scale = options.scale || .02
+            this.modal = false
+            this.target = options.target
+            this.targetOffset = options.targetOffset
+        
+            this.mouseOffset = new THREE.Vector2(0, 0)
+            this.cameraAngleDelta = new THREE.Vector2(0, 0)
+            this.wheelSelector = 0
+            this.tween = new TWEEN.Tween()
+            this.tweenLoop
+        
+            this.getMouseOffset = (ev) => {
+                scope.mouseOffset.set(2 * (ev.clientX - window.innerWidth / 2) / window.innerWidth, 2 * (window.innerHeight / 2 - ev.clientY) / window.innerHeight)
+                return scope.mouseOffset
+            }
+            this.getCameraAngleDelta = () => {
+                scope.mouseOffset.x < 0 ? scope.cameraAngleDelta.setX(-scope.easing(Math.abs(scope.mouseOffset.x))) : scope.cameraAngleDelta.setX(scope.easing(Math.abs(scope.mouseOffset.x)))
+                scope.mouseOffset.y < 0 ? scope.cameraAngleDelta.setY(-scope.easing(Math.abs(scope.mouseOffset.y))) : scope.cameraAngleDelta.setY(scope.easing(Math.abs(scope.mouseOffset.y)))
+                return scope.cameraAngleDelta
+            }
+        
+            this.update = () => {
+            }
+        
+            document.addEventListener('mousemove', (ev) => {
+                if (scope.modal === true) return
+                ev.preventDefault()
+                ev.stopPropagation()
+                let mouse = scope.getMouseOffset(ev)
+                let camera = scope.getCameraAngleDelta()
+            })
+            document.addEventListener('wheel', (ev) => {
+                if (scope.modal === true) return
+                ev.preventDefault()
+                ev.stopPropagation()
+                scope.wheelSelector += ev.deltaY / Math.abs(ev.deltaY)
+                // console.log(scope.wheelSelector)
+            })
+        }
+        control = new flexCamMouseControl({
+            easing: TWEEN.Easing.Quadratic.In
+        }, renderer.domElement)
 
         clock = new THREE.Clock()
 
-        // renderer.domElement.style.cursor = 'crosshair'
-    }
+        let index = platforms.length - 1
+        let t = setInterval(() => {
+            let square = platforms[Math.floor(index * Math.random())]
+            new TWEEN.Tween(square.rotation).easing(TWEEN.Easing.Quadratic.InOut).to({
+                x: (square.rotation.x === 0 ? square.position.y / 20 : 0),
+                y: (square.rotation.y === 0 ? -square.position.x / 20 : 0),
+                z: 0
+            }, 400).start()
+        }, Math.random() * 450 + 50)
 
-    const animate = () => {
-        // control.update(clock.getDelta())
-        requestAnimationFrame(animate)
-        updatePhysics()
-        render()
-    }
-
-    const updatePhysics = () => {
-        // Step the physics world
-        world.step(timeStep);
-        // horizontal movement ### learn matrix operations !!!
-        body.applyLocalForce(new CANNON.Vec3(commandVector.x, 0, 0), new CANNON.Vec3(0, 0, 1))
-        // Copy coordinates from Cannon.js to Three.js
-        mesh.position.copy(body.position);
-        mesh.quaternion.copy(body.quaternion);
+        moveCamera(
+            new THREE.Vector3(0, -2, 17),
+            new THREE.Vector3(0, -.1, 0),
+        )
     }
 
     const render = () => {
-        // camera.position = mesh.position.add(new THREE.Vector3(0, -10, 5))
-        camera.lookAt(mesh.position)
-        camera.position.copy(body.position.vadd(new CANNON.Vec3(0, -10, 5)))
+        requestAnimationFrame(render)
+        camera.lookAt(viewTarget)
         camera.rotateY(-control.cameraAngleDelta.x * control.scale)
-        camera.rotateX(control.cameraAngleDelta.y * control.scale + .1) // look a little bit higher than the body position
+        camera.rotateX(control.cameraAngleDelta.y * control.scale)
+
+        raycaster.setFromCamera(pointer, camera)
+        const intersects = raycaster.intersectObjects(scene.children);
+        if (intersects.length > 0) { // if there is intersection with an object
+            if (INTERSECTED != intersects[0].object) { // if intersecting new object
+                if (INTERSECTED && INTERSECTED.onPointerOut) INTERSECTED.onPointerOut(INTERSECTED, scene) // return the previous intersected object to a non-intersected state
+                INTERSECTED = intersects[0].object; // update intersected object referrence
+                if (INTERSECTED.onPointerIn) INTERSECTED.onPointerIn(INTERSECTED, scene) // set intersected object to an intersecting state
+            }
+        } else { // if there is no intersection
+            if (true) { // execute when no new intersection
+                if (INTERSECTED && INTERSECTED.onPointerOut) INTERSECTED.onPointerOut(INTERSECTED, scene) // return the previous intersected object to a non-intersected state
+                INTERSECTED = null;
+            }
+        }
         TWEEN.update()
         renderer.render(scene, camera)
     }
 
-    initCannon()
     initThree()
-    animate()
+    render()
 })
