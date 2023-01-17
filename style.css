@@ -1,0 +1,18 @@
+* {
+    border: 1px solid;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    color: white;
+}
+
+html,
+body {
+    border: 0;
+    position: absolute;
+}
+
+canvas {
+    position: absolute;
+    border: 0;
+}
