@@ -158,17 +158,21 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let v = 0; v < verticalCount; v++) {
             for (let h = 0; h < horizontalCount; h++) {
                 let buttonBackgroundColor = new THREE.Color(0xffffff)
-                const buttonFaceMaterial = new THREE.MeshPhongMaterial({
+                const buttonTopFaceMaterial = new THREE.MeshPhongMaterial({
+                    color: buttonBackgroundColor,
+                    shininess: 100
+                })
+                const buttonRestMaterial = new THREE.MeshPhongMaterial({
                     color: buttonBackgroundColor,
                     shininess: 100
                 })
                 const buttonFacesMaterials = [
-                    new THREE.MeshPhongMaterial({ color: buttonBackgroundColor }), //right side
-                    new THREE.MeshPhongMaterial({ color: buttonBackgroundColor }), //left side
-                    new THREE.MeshPhongMaterial({ color: buttonBackgroundColor }), //top side
-                    new THREE.MeshBasicMaterial({ color: buttonBackgroundColor }), //bottom side
-                    buttonFaceMaterial, //front side
-                    new THREE.MeshPhongMaterial({ color: buttonBackgroundColor }) //back side
+                    buttonRestMaterial,
+                    buttonRestMaterial,
+                    buttonRestMaterial,
+                    buttonRestMaterial,
+                    buttonTopFaceMaterial, // top face
+                    buttonRestMaterial
                 ]
                 const buttonMesh = new THREE.Mesh(buttonGeometry, buttonFacesMaterials)
                 buttonMesh.position.x = - Math.floor(horizontalCount / 2) * (1 + padding) + (horizontalCount % 2 == 0 ? .5 * (1 + padding) : 0) + h * (1 + padding)
@@ -178,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'y': Math.floor(buttonMesh.position.y)
                 })
                 if (key !== undefined) {
-                    buttonFaceMaterial.map = generateTexture(key.character)
+                    buttonTopFaceMaterial.map = generateTexture(key.character.toUpperCase())
                     key.mesh = buttonMesh
                 }
                 buttonMesh.castShadow = true;
@@ -265,12 +269,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         _.each(keyMap, (key) => {
             Mousetrap.bind(key.character, () => {
-                if(key.pressed) return
+                if (key.pressed) return
                 new TWEEN.Tween(key.mesh.position).to({
                     z: -.1
                 }, 20).onComplete(() => {
                     key.pressed = true
-                    if(key.action) key.action()
+                    if (key.action) key.action()
                 }).start()
             })
             Mousetrap.bind(key.character, () => {
