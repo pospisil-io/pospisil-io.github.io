@@ -131,18 +131,18 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let v = 0; v < verticalCount; v++) {
             for (let h = 0; h < horizontalCount; h++) {
                 let buttonBackgroundColor = new THREE.Color(0xffffff)
-                const buttonFaceMaterial = new THREE.MeshStandardMaterial({
+                const buttonFaceMaterial = new THREE.MeshPhongMaterial({
                     color: buttonBackgroundColor,
                     roughness: 0,
                     metalness: 0
                 })
                 const buttonFacesMaterials = [
-                    new THREE.MeshStandardMaterial({ color: buttonBackgroundColor }), //right side
-                    new THREE.MeshStandardMaterial({ color: buttonBackgroundColor }), //left side
-                    new THREE.MeshStandardMaterial({ color: buttonBackgroundColor }), //top side
+                    new THREE.MeshPhongMaterial({ color: buttonBackgroundColor }), //right side
+                    new THREE.MeshPhongMaterial({ color: buttonBackgroundColor }), //left side
+                    new THREE.MeshPhongMaterial({ color: buttonBackgroundColor }), //top side
                     new THREE.MeshBasicMaterial({ color: buttonBackgroundColor }), //bottom side
                     buttonFaceMaterial, //front side
-                    new THREE.MeshStandardMaterial({ color: buttonBackgroundColor }) //back side
+                    new THREE.MeshPhongMaterial({ color: buttonBackgroundColor }) //back side
                 ]
                 const buttonMesh = new THREE.Mesh(buttonGeometry, buttonFacesMaterials)
                 buttonMesh.position.x = - Math.floor(horizontalCount / 2) * (1 + padding) + (horizontalCount % 2 == 0 ? .5 * (1 + padding) : 0) + h * (1 + padding)
