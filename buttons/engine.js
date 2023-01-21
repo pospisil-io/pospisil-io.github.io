@@ -175,12 +175,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     buttonRestMaterial
                 ]
                 const buttonMesh = new THREE.Mesh(buttonGeometry, buttonFacesMaterials)
+                const posX =  - Math.floor(horizontalCount / 2) + (horizontalCount % 2 == 0 ? .5 : 0) + h
+                const posY =  - Math.floor(verticalCount / 2) + (verticalCount % 2 == 0 ? .5 : 0) + v
                 buttonMesh.position.x = - Math.floor(horizontalCount / 2) * (1 + padding) + (horizontalCount % 2 == 0 ? .5 * (1 + padding) : 0) + h * (1 + padding)
                 buttonMesh.position.y = - Math.floor(verticalCount / 2) * (1 + padding) + (verticalCount % 2 == 0 ? .5 * (1 + padding) : 0) + v * (1 + padding)
                 const key = _.find(keyMap, {
-                    'x': Math.floor(buttonMesh.position.x),
-                    'y': Math.floor(buttonMesh.position.y)
+                    'x': Math.floor(posX),
+                    'y': Math.floor(posY)
                 })
+                console.log(posX, posY, ":", Math.floor(buttonMesh.position.x),  Math.floor(buttonMesh.position.x) - buttonMesh.position.x, (key ? "_" + key.character : ""))
                 if (key !== undefined) {
                     buttonTopFaceMaterial.map = generateTexture(key.character.toUpperCase())
                     key.mesh = buttonMesh
@@ -267,44 +270,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        _.each(keyMap, (key) => {
-            Mousetrap.bind(key.character, () => {
-                if (key.pressed) return
+        document.addEventListener('keydown', (ev) => {
+            const key = _.find(keyMap, { character: ev.key.toLowerCase() })
+            if (key && !ev.repeat) {
                 new TWEEN.Tween(key.mesh.position).to({
                     z: -.1
                 }, 20).onComplete(() => {
-                    key.pressed = true
                     if (key.action) key.action()
                 }).start()
-            })
-            Mousetrap.bind(key.character, () => {
-                key.pressed = false
+            }
+        })
+        document.addEventListener('keyup', (ev) => {
+            const key = _.find(keyMap, { character: ev.key.toLowerCase() })
+            if (key) {
                 new TWEEN.Tween(key.mesh.position).to({
                     z: 0
                 }, 80).delay(20).start()
-            }, 'keyup')
+            }
         })
-
-        // document.addEventListener('keydown', (ev) => {
-        //     if (_.includes(keyMap, ev.key.toLowerCase()) && !ev.repeat) {
-        //         const key = _.find(keyMap, { character: ev.key.toLowerCase() })
-        //         if (key) {
-        //             new TWEEN.Tween(key.mesh.position).to({
-        //                 z: -.1
-        //             }, 20).onComplete(() => {
-        //                 if (key.action) key.action()
-        //             }).start()
-        //         }
-        //     }
-        // })
-        // document.addEventListener('keyup', (ev) => {
-        //     if (_.includes(keyMap, ev.key.toLowerCase())) {
-        //         const key = _.find(keyMap, { character: ev.key.toLowerCase() })
-        //         new TWEEN.Tween(key.mesh.position).to({
-        //             z: 0
-        //         }, 80).delay(20).start()
-        //     }
-        // })
 
         const flexCamMouseControl = function (options, rendererDomElement) {
             const scope = this
